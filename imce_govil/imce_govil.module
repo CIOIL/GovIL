@@ -1,0 +1,361 @@
+<?php
+
+function imce_govil_menu() {
+
+  $items['delete_thumb'] = array(
+    'page callback' => 'delete_thumb',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['imce_file_usage_list'] = array(
+    'page callback' => 'imce_file_usage_list',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['imce_file_usage_delete'] = array(
+    'page callback' => 'imce_file_usage_delete',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+    
+  $items['admin/config/media/imce_govil'] = array(
+    'title' => 'IMCE govil',
+    'description' => 'IMCE govil settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('imce_govil_form'),
+    'access arguments' => array('administer imce'),
+    'file' => 'inc/imce_govil.admin.inc',
+  );
+
+  return $items;
+}
+
+function imce_govil_form_alter(&$form, &$form_state, $form_id) {
+
+  $group_types = variable_get('imce_govil_group_types', get_group_types());
+  $group_types = explode(',', $group_types);
+  
+  foreach ($group_types as $type) {
+    if ($form['form_id']['#value'] == $type."_node_form" && strpos($form['#action'], "/node/add/") !== FALSE) {
+      // Adding custom callback function on group type node.
+      $form['actions']['submit']['#submit'][] = 'imce_callback_on_postsave_group';
+    }
+  }
+}
+
+/**
+ * Return the directory name based on the gid
+ */
+function govil_imce_get_directory(&$imce, $user) {
+
+  // Delete the directory session
+  if (isset($_SESSION['imce_directory'])) {
+    unset($_SESSION['imce_directory']);
+  }
+
+  // Get the $_GET parameters
+  $params = drupal_get_query_parameters();
+
+  // If called from node page
+  if (isset($params['parent_url'])) {
+    $path = $params['parent_url'];
+  }
+  // If called from user page
+  elseif (arg(0) == 'user' && is_numeric(arg(1)) && arg(2) == 'imce') {
+    $path = request_path();
+  }
+  else {
+    $path = explode('?', $_SERVER['HTTP_REFERER'])[0];
+  }
+  $tokens = explode('/', $path);
+
+  $general_dir = variable_get('imce_govil_general_dir_name');
+  $types_with_general = variable_get('imce_govil_types_with_general_dir');
+  $group_types = variable_get('imce_govil_group_types', get_group_types());
+  
+  $types_with_general = explode(',', $types_with_general);
+  $group_types = explode(',', $group_types);
+
+  // 1. Refresh directory + Add subdirectory + Remove subdirectory
+  if (isset($params['jsop']) && isset($params['dir'])) {
+    $imce['directories'][0]['name'] = $params['dir'];
+  }
+  // 2. Node edit page
+  elseif ((count($tokens) >= 3 && $tokens[count($tokens) - 3] == 'node' && is_numeric($tokens[count($tokens) - 2])) || !empty($params['tnid'])) {
+    $nid = (empty($params['tnid'])) ? $tokens[count($tokens) - 2] : $params['tnid'];
+    $node = node_load($nid);
+    // Check node access
+    if (!node_access('update', $node)) {
+      drupal_set_message(t('You do not have permissions'), 'error');
+      return FALSE;
+    }
+    if ($node->tnid > 0) {
+      $translations = translation_node_get_translations($node->tnid);
+      $node = (isset($translations['he'])) ? node_load($translations['he']->nid) : node_load($node->tnid);
+    }
+    // If node is content of group
+    if (isset($node->og_group_ref[LANGUAGE_NONE][0]['target_id'])) {
+      $gid = $node->og_group_ref[LANGUAGE_NONE][0]['target_id'];
+      if ($node->tnid == 0) {
+        $gnode = node_load($gid);
+        if ($gnode->tnid > 0) {
+          $translations = translation_node_get_translations($gnode->tnid);
+          $gid = (isset($translations['he'])) ? $translations['he']->nid : $gnode->tnid;
+        }
+      }
+      $imce['directories'][0]['name'] = "groupid_" . $gid;
+    }
+    // If node is group
+    elseif (isset($node->group_group[LANGUAGE_NONE][0]['value']) && $node->group_group[LANGUAGE_NONE][0]['value'] == '1') {
+      $imce['directories'][0]['name'] = "groupid_" . $node->nid;
+    }
+    elseif (in_array($node->type, $types_with_general)) {
+      $imce['directories'][0]['name'] = $general_dir;
+    }
+    else {
+      return FALSE;
+    }
+  }
+  // 3. Add new node with og_group_ref
+  elseif (count($tokens) >= 4 && $tokens[count($tokens) - 4] == 'node' && $tokens[count($tokens) - 3] == 'add' && is_numeric($tokens[count($tokens) - 1])) {
+    $node = node_load($tokens[count($tokens) - 1]);
+    // Check node access
+    if (!node_access('update', $node)) {
+      drupal_set_message(t('You do not have permissions'), 'error');
+      return FALSE;
+    }
+    if ($node->tnid > 0) {
+      $node = node_load($node->tnid);
+    }
+    $imce['directories'][0]['name'] = "groupid_" . $node->nid;
+  }
+  // 4. Add new node: without og_group_ref
+  elseif (count($tokens) >= 3 && $tokens[count($tokens) - 3] == 'node' && $tokens[count($tokens) - 2] == 'add' && in_array($tokens[count($tokens) - 1], $types_with_general)) {
+    $imce['directories'][0]['name'] = $general_dir;
+  }
+  // 5. Add new node of group types
+  elseif (count($tokens) >= 3 && $tokens[count($tokens) - 3] == 'node' && $tokens[count($tokens) - 2] == 'add' && in_array($tokens[count($tokens) - 1], $group_types)) {
+    if (isset($params['formid'])) {
+      $imce['directories'][0]['name'] = "temp_" . $params['formid'];
+    }
+  }
+  // 6. User page
+  elseif (count($tokens) >= 3 && $tokens[count($tokens) - 3] == 'user' && is_numeric($tokens[count($tokens) - 2]) && $tokens[count($tokens) - 1] == 'imce') {
+    $user = user_load($tokens[count($tokens) - 2]);
+    $gnode = og_get_groups_by_user($user);
+    $gids = $gnode['node'];
+    asort($gids);
+    foreach ($gids as $group => $gid) {
+      $imce['directories'][]['name'] = 'groupid_' . $gid;
+    }
+    // If user is administrator or govadmin
+    if (user_access('access imce_govil_dirs', $user)) {
+      $imce['directories'][]['name'] = $general_dir;
+      $imce['directories'][]['name'] = variable_get('imce_govil_delete_dir_name');
+    }
+  }
+  foreach ($imce['directories'] as $key => $dir) {
+    $imce['directories'][$key] += array(
+      'browse' => TRUE, 
+      'upload' => TRUE, 
+      'thumb' => FALSE, 
+      'resize' => FALSE,
+      'rmdir' => TRUE, 
+      'mkdir' => TRUE,
+      'subnav' => TRUE, 
+      'delete' => TRUE,
+    );
+  }
+  return FALSE;
+}
+
+/*
+* Delete thumbnail when replace file in IMCE file browser
+*/
+function delete_thumb() {
+  global $user;
+  if (isset($_POST['img_dir']) && isset($_POST['img_name'])) {
+    $dirs = explode('/', $_POST['img_dir']);
+    $gid = explode('groupid_', $dirs[0])[1];
+    $general_dir = variable_get('imce_govil_general_dir_name');
+    if ((is_numeric($gid) && (og_is_member('node', $gid) || user_access('administer site configuration'))) || ($dirs[0] == $general_dir && user_access('access imce_govil_dirs') )) {
+      $img_url = 'public://' . $_POST['img_dir'] . '/' . $_POST['img_name'];
+      image_path_flush($img_url);
+      drupal_json_output('The image was flushed');
+      return;
+    }
+  }
+  drupal_json_output('You do not have permissions');
+}
+
+/*
+* Return file usage list before deletion in IMCE file browser
+*/
+function imce_file_usage_list() {
+  global $user, $base_url, $language;
+  if (isset($_POST['relpath'])) {
+    $langcode = (isset($_POST['langcode']) ? $_POST['langcode'] : 'en');
+    $dirs = explode('/', $_POST['relpath']);
+    $gid = explode('groupid_', $dirs[0])[1];
+    $general_dir = variable_get('imce_govil_general_dir_name');
+    if ((is_numeric($gid) && (og_is_member('node', $gid) || user_access('administer site configuration'))) || ($dirs[0] == $general_dir && user_access('access imce_govil_dirs') )) {
+      $uri = 'public://' . urldecode($_POST['relpath']);
+      $files = file_load_multiple(array(), array('uri' => $uri));
+      $file = reset($files);
+      if (isset($file->fid)) {
+        // Delete if count = 1
+        $result = db_delete('file_usage')->condition('module', 'file')->condition('fid', $file->fid)->condition('count', 1, '=')->execute();
+        $refs = file_usage_list($file);
+        $res = '';
+        if (isset($refs['file']['node'])) {
+          foreach ($refs['file']['node'] as $nid => $count) {
+            $res .= "<div><a target='_blank' href='$base_url/$language->language/node/$nid/edit'>$base_url/$language->language/node/$nid/edit</a></div>";
+          }
+        }
+        if (isset($refs['file']['field_collection_item'])) {
+          foreach ($refs['file']['field_collection_item'] as $eid => $count) {
+            $fce = entity_load('field_collection_item', array($eid));
+            if (isset($fce[$eid])) {
+              $host_entity = $fce[$eid]->hostEntity();
+              if (!isset($refs['file']['node'][$host_entity->nid])) {
+                $res .= "<div><a target='_blank' href='$base_url/$language->language/node/$host_entity->nid/edit'>$base_url/$language->language/node/$host_entity->nid/edit</a></div>";
+              }
+            }
+          }
+        }
+        if (!empty($res)) {
+          $res = "<div class='imce-filename'>" . t("File name", array(), array('langcode' => $langcode)) . " - " . urldecode(end($dirs)) . " :</div>" . $res;
+        }
+        drupal_json_output($res);
+      }
+      return;
+    }
+  }
+  drupal_json_output('You do not have permissions');
+}
+
+/*
+* Delete file usage before deletion in IMCE file browser
+*/
+function imce_file_usage_delete() {
+  global $user;
+  if (isset($_POST['relpath'])) {
+    $dirs = explode('/', $_POST['relpath']);
+    $gid = explode('groupid_', $dirs[0])[1];
+    $general_dir = variable_get('imce_govil_general_dir_name');
+    if ((is_numeric($gid) && (og_is_member('node', $gid) || user_access('administer site configuration'))) || ($dirs[0] == $general_dir && user_access('access imce_govil_dirs') )) {
+      $uri = 'public://' . urldecode($_POST['relpath']);
+      $files = file_load_multiple(array(), array('uri' => $uri));
+      $file = reset($files);
+      if (isset($file->fid)) {
+        file_usage_delete($file, 'file', NULL, NULL, 0);
+        $uri_delete = 'public://govil_delete/' . urldecode($_POST['relpath']);
+        $dir_delete = substr($uri_delete, 0, strrpos($uri_delete, '/'));
+        if (file_prepare_directory($dir_delete, FILE_CREATE_DIRECTORY)) {
+          file_unmanaged_copy($uri, $uri_delete, FILE_EXISTS_RENAME);
+        }
+        drupal_json_output($uri);
+        return;
+      }
+    }
+  }
+  drupal_json_output('You do not have permissions');
+}
+
+/*
+* Alter the upload form
+*/
+function imce_govil_form_imce_upload_form_alter(&$form, &$form_state) {
+  global $language;
+  drupal_add_js(
+    array(
+      'after_usage_delete' => FALSE,
+    ),
+    array('type' => 'setting')
+  );
+  drupal_add_js(drupal_get_path('module', 'imce_govil') . "/js/imce_govil.js");
+  if ($language->direction == LANGUAGE_RTL) {
+    drupal_add_css(drupal_get_path('module', 'imce_govil') . "/imce_govil-rtl.css");
+  }
+}
+
+/*
+* Replace js files
+*/
+function imce_govil_js_alter(&$javascript) {
+  $javascript['sites/all/modules/imce_filefield/imce_filefield.js'] = array(
+    'group' => 0,
+    'cache' => TRUE,
+    'defer' => FALSE,
+    'weight' => '0',
+    'every_page' => FALSE,
+    'preprocess' => TRUE,
+    'type' => 'file',
+    'scope' => 'header',
+    'data' => drupal_get_path('module', 'imce_govil') . '/js/imce_filefield.js'
+  );
+
+  $javascript['sites/all/modules/imce/js/imce.js'] = array(
+    'group' => 0,
+    'cache' => TRUE,
+    'defer' => FALSE,
+    'weight' => '0',
+    'every_page' => FALSE,
+    'preprocess' => TRUE,
+    'type' => 'file',
+    'scope' => 'header',
+    'data' => drupal_get_path('module', 'imce_govil') . '/js/imce.js'
+  );
+}
+
+/*
+* When we create a new group node, we need to move all the files from the temp folder to a new folder based on the new gid.
+*/
+function imce_callback_on_postsave_group($form, &$form_state) {
+  $nid = $form_state['values']['nid'];
+  $old_dir_name = 'temp_' . $form_state['build_info']['args'][0]->form_build_id;
+  $new_dir_name = 'groupid_' . $nid;
+  $old_uri = 'public://' . $old_dir_name;
+  if (file_prepare_directory($old_uri)) {
+    if (!rename(drupal_realpath('public://') . '/' . $old_dir_name, drupal_realpath('public://') . '/' . $new_dir_name)) {
+      drupal_set_message(t('Failed to change the name of the directory: @olddir Please upload all the files again', array('@olddir' => $old_dir_name)), 'error');
+    }
+    // Update the name of the new directory in the DB
+    else {
+      db_update('file_managed')->expression('uri', 'REPLACE(uri, :old_dir, :new_dir)', array(':old_dir' => 'public://' . $old_dir_name . '/', ':new_dir' => 'public://' . $new_dir_name . '/'))->execute();
+    }
+  }
+}
+
+/*
+* Return all the group content types
+*/
+function get_group_types() {
+  $group_types = db_select('field_config_instance', 'c')
+    ->fields('c', array('bundle'))
+  	->condition('c.field_name', 'group_group', '=')
+  	->execute()
+  	->fetchAll();  
+
+  $types = array();   
+
+  foreach ($group_types as $type) {
+    $types[] = $type->bundle;
+  }
+
+  return empty($types)? '' : implode(',', $types);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function imce_govil_permission() {
+  return array(
+    'access imce_govil_dirs' => array(
+      'title' => t('Access IMCE govil special directories'),
+    )
+  );
+}
+

@@ -1,0 +1,40 @@
+# Hebrew translation of IMCE for govil (7.x-1.0)
+# Copyright (c) 2018 by the govil translation team
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: IMCE for govil (7.x-1.0)\n"
+"POT-Creation-Date: 2018-07-17 23:18+0000\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Language-Team: Hebrew\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n!=1);\n"
+
+msgid "The following files will be deleted from the following pages (and page versions)"
+msgstr "הקבצים הבאים ימחקו מהדפים הבאים (וכן מגרסאות הדפים)"
+
+msgid "You are about to replace the following files from the following pages (and page versions)"
+msgstr "הקבצים הבאים עומדים להיות מוחלפים בדפים הבאים (וכן מגרסאות הדפים)"
+
+msgid "Are you sure you want to replace the files?"
+msgstr "האם אתה בטוח שברצונך להחליף את הקבצים?"
+
+msgid "Are you sure you want to delete the selected files?"
+msgstr "האם אתה בטוח שברצונך למחוק את הקבצים הנבחרים?"
+
+msgid "Note that the current file is different from the file: @filename so the file will not be overwritten"
+msgstr "שים לב שהקובץ הנוכחי שונה מהקובץ: @filename כך שהקובץ לא יוחלף"
+
+msgid "Insert group types"
+msgstr "הזן סוגי תוכן מסוג קבוצה"
+
+msgid "Enter folder name that appear in all the nodes without gid"
+msgstr "הזן את שם התיקייה שתופיע בכל סוגי התוכן שלא משוייכים לקבוצה"
+
+msgid "Enter folder name that keeps all the files deleted from IMCE"
+msgstr "הזן את שם התיקייה שתכיל את כל הקבצים שנמחקים ממערכת הקבצים לצורך שחזור"
+
+msgid "Enter content types with general directory"
+msgstr "הזן את סוגי התוכן ללא קבוצה שתופיע להם תיקייה כללית"

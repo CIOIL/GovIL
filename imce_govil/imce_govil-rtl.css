@@ -1,0 +1,17 @@
+.imce-title,
+.imce-filename {
+  text-align: right;
+  direction: rtl;
+}
+
+.ui-dialog .ui-dialog-buttonpane .ui-dialog-buttonset {
+  float: left;
+}
+
+.ui-dialog .ui-dialog-titlebar-close {
+  left: .3em;
+}
+
+.ui-dialog .ui-dialog-buttonpane button {
+  float: right;
+}

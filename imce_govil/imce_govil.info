@@ -1,0 +1,12 @@
+name = "IMCE for govil" 
+description = "IMCE for govil"
+core = "7.x"
+package = "Media"
+version = "7.x-1.0"
+project = "imce_govil"
+
+dependencies[] = "imce"
+dependencies[] = "og"
+
+stylesheets[all][] = imce_govil.css
+

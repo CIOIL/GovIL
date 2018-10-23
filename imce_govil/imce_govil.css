@@ -1,0 +1,28 @@
+.imce-filefield-wrapper~.image-widget-data,
+.imce-filefield-wrapper~.file-widget {
+  display: none;
+}
+
+.imce a:link,
+.imce a:visited {
+  text-decoration: underline;
+}
+
+.imce .ui-widget-content a {
+  color: #0071B3;
+}
+
+.imce-title,
+.imce-filename {
+  font-family: Arial;
+  font-size: medium;
+}
+
+.imce-filename ~ div,
+.ui-dialog .ui-dialog-buttonset {
+  font-size: medium;
+}
+
+a:focus {
+  outline: none;
+}

@@ -1,0 +1,35 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the imce_govil module.
+ */
+
+function imce_govil_import_file_translations($languages = NULL) {
+  if (empty($languages)) {
+    $languages = array_keys(language_list());
+  }
+  foreach($languages as $langcode) {
+    $po_file = DRUPAL_ROOT . '/' . drupal_get_path('module', 'imce_govil') . '/translations/imce_govil.' . $langcode . '.po';
+    if (file_exists($po_file)) {
+      $file = new stdClass();
+      $file->uri = $po_file;
+      $file->filepath = $po_file;
+      $file->filename = basename($po_file);
+      _locale_import_po($file, $langcode, LOCALE_IMPORT_OVERWRITE, 'default');
+    }
+  }
+}
+
+/**
+ * Implements hook_install
+ */
+function imce_govil_install() {
+  // Translate strings
+  imce_govil_import_file_translations();
+
+  // Set function that return the directory
+  if (!empty(drupal_get_path('module', 'imce'))) { // imce is exist in files
+    variable_set('imce_custom_init', array('govil_imce_get_directory' => 1));
+  } 
+}
